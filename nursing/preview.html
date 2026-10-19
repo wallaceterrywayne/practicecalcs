@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nursing Dosage Calculations: problem preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<script src="vendor/katex/katex.min.js"></script>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="palette.css">
+</head>
+<body>
+<header>
+  <h1>Problem preview</h1>
+  <span class="count" id="count"></span>
+  <button class="btn ghost" id="random">Random problem</button>
+  <span class="count">Open a specific ID: </span>
+  <input type="text" id="idbox" placeholder="a problem ID" style="width:280px">
+</header>
+<div class="layout">
+  <nav id="nav"></nav>
+  <main>
+    <div class="card" id="problem"></div>
+    <div class="card" id="solution"></div>
+  </main>
+</div>
+
+<script src="program.js"></script>
+<script src="loader.js"></script>
+<script src="diagrams.js"></script>
+<script src="labels.js"></script>
+<script src="figures.js"></script>
+<script src="answers.js"></script>
+<script src="render.js"></script>
+<script>
+PC.loadMeta().then(() => PC.loadTopics(PC.meta.topics.map((t) => t.id))).then(() => {
+  const pool = Object.values(PC.pool).flat();
+  const byId = new Map(pool.map((p) => [p.id, p]));
+  let current = null;
+
+  const bank = PC.meta.bank || {};
+  document.getElementById("count").textContent = `${pool.length} problems · ` +
+    (bank.draft || !bank.version ? `draft (not yet published${bank.version ? `; last published bank v${bank.version}` : ""})` : `bank v${bank.version}, published ${bank.published}`);
+
+  // Sidebar: topic → card → variant.
+  const nav = document.getElementById("nav");
+  for (const t of PC.meta.topics) {
+    for (const c of t.cards.filter((c) => c.count)) {
+      nav.insertAdjacentHTML("beforeend", `<h3>${Render.esc(t.name)} · ${Render.esc(c.name)}</h3>`);
+      const variants = [...new Set(pool.filter((p) => p.card === c.id).map((p) => p.variant))];
+      for (const v of variants) {
+        const n = pool.filter((p) => p.variant === v).length;
+        const b = document.createElement("button");
+        b.dataset.variant = v;
+        b.innerHTML = `${Render.esc(v.split(".").slice(1).join("."))} <span class="vmeta">(${n})</span>`;   // template name (the type is the group above)
+        b.onclick = () => {
+          const opts = pool.filter((p) => p.variant === v);
+          show(opts[Math.floor(Math.random() * opts.length)]);
+        };
+        nav.appendChild(b);
+      }
+    }
+  }
+
+  function show(p) {
+    current = p;
+    history.replaceState(null, "", "#" + p.id);
+    document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("active", b.dataset.variant === p.variant));
+    document.getElementById("problem").innerHTML = `
+      <div class="pid"><span>${p.id}</span><span>fingerprint ${p.fp || ""}</span></div>
+      ${Render.problemHTML(p)}
+      <div class="answer-row" id="answer"></div>
+      <div class="feedback" id="fb"></div>
+      <div class="tools">
+        <button class="btn ghost" id="toggle">Show worked solution</button>
+        <button class="btn ghost" id="again">Another like this</button>
+      </div>
+`;
+    const sol = document.getElementById("solution");
+    sol.classList.remove("open");
+    Render.renderSolution(p, sol);
+
+    const fb = document.getElementById("fb");
+    const ans = Answers.mount(document.getElementById("answer"), p.answer, (r) => {
+      if (r.error) { fb.className = "feedback bad"; fb.textContent = r.error; return; }
+      const ok = Answers.grade(p.answer, r.value).correct;    // exact match to the stated rounding
+      fb.className = "feedback " + (ok ? "ok" : "bad");
+      fb.textContent = ok ? `Correct: ${p.answer.display}` : "Not quite. Check your setup, or open the worked solution.";
+    });
+    if (ans.input) ans.input.addEventListener("input", () => { fb.className = "feedback"; });
+    document.getElementById("toggle").onclick = (e) => {
+      sol.classList.toggle("open");
+      e.target.textContent = sol.classList.contains("open") ? "Hide worked solution" : "Show worked solution";
+    };
+    document.getElementById("again").onclick = () => {
+      const opts = pool.filter((q) => q.variant === p.variant && q.id !== p.id);
+      show(opts[Math.floor(Math.random() * opts.length)]);
+    };
+  }
+
+  const random = () => show(pool[Math.floor(Math.random() * pool.length)]);
+  document.getElementById("random").onclick = random;
+  document.getElementById("idbox").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const p = byId.get(e.target.value.trim());
+    if (p) show(p); else alert("That ID is not in the current pool.");
+  });
+
+  const start = byId.get(decodeURIComponent(location.hash.slice(1)));
+  start ? show(start) : random();
+});
+</script>
+</body>
+</html>

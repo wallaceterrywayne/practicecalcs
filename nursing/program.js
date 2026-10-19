@@ -1,0 +1,3 @@
+// Built from programs/nursing/program.yaml by build.py. Don't edit by hand.
+window.PROGRAM = {"id": "nursing", "title": "Nursing Dosage Calculations", "heading": "Nursing dosage calculations", "subject": "nursing dosage calculations", "storage_key": "practice.nursing.progress.v1", "file_prefix": "nursecalc-progress", "telemetry_prefix": "practice.nursing", "demo_hard": "recon|safe|titrations|hi\\.|weight"};
+window.PC_CONFIG = {"telemetry": {"endpoint": "", "study": "pilot", "fields": ["day", "problem", "fp", "bank", "format", "topic", "card", "why", "position", "setSize", "correct", "viewedBefore", "rating", "counted", "ms", "stability", "size", "catchUp", "newTopic", "focus", "topics", "daily"]}};

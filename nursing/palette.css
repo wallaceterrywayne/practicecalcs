@@ -1,0 +1,22 @@
+/* Palette for the nursing program: green on cool neutrals. The shared design is in shared/web/style.css. */
+:root {
+  --bg: #eef0ec; --panel: #fafbf8; --ink: #1d2320; --muted: #5d6762; --line: #d3d8d2;
+  --accent: #2f6b57; --accent-soft: #e2ebe5; --ok: #2a7a3d; --ok-soft: #e3f0e5;
+  --bad: #a33b2b; --bad-soft: #f6e5e1; --check: #3d5a73; --check-soft: #e5ebf0;
+  --liquid: #4a7fb5; --drug-stroke: none; --on-accent: #ffffff;
+}
+/* Dark palette: follows the system setting, and an explicit data-theme on the root wins both ways. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161a18; --panel: #202623; --ink: #e6ebe7; --muted: #9aa49f; --line: #343c38;
+    --accent: #7cc2a6; --accent-soft: #28332e; --ok: #8fcf9a; --ok-soft: #22312a;
+    --bad: #f08a78; --bad-soft: #3a2522; --check: #9db8d6; --check-soft: #232c35;
+    --liquid: #6fa3d9; --drug-stroke: var(--muted); --on-accent: #0f1f19; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+    --bg: #161a18; --panel: #202623; --ink: #e6ebe7; --muted: #9aa49f; --line: #343c38;
+    --accent: #7cc2a6; --accent-soft: #28332e; --ok: #8fcf9a; --ok-soft: #22312a;
+    --bad: #f08a78; --bad-soft: #3a2522; --check: #9db8d6; --check-soft: #232c35;
+    --liquid: #6fa3d9; --drug-stroke: var(--muted); --on-accent: #0f1f19; color-scheme: dark;
+}
