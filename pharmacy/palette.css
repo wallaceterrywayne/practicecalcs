@@ -1,0 +1,22 @@
+/* Palette for the pharmacy program: brick red on warm neutrals. The shared design is in shared/web/style.css. */
+:root {
+  --bg: #f2efeb; --panel: #fbfaf8; --ink: #241f1c; --muted: #6b625b; --line: #ddd6ce;
+  --accent: #7a2e1f; --accent-soft: #f2e5e0; --ok: #2f6b3a; --ok-soft: #e6f0e8;
+  --bad: #9a2a2a; --bad-soft: #f6e4e2; --check: #3c5a8a; --check-soft: #e7ecf5;
+  --liquid: #4a7fb5; --drug-stroke: none; --on-accent: #ffffff;
+}
+/* Dark palette: follows the system setting, and an explicit data-theme on the root wins both ways. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1b1816; --panel: #252120; --ink: #ece6e1; --muted: #a39a92; --line: #3b3532;
+    --accent: #e58a72; --accent-soft: #3a2822; --ok: #8fcf9a; --ok-soft: #22312a;
+    --bad: #f08c8c; --bad-soft: #3a2324; --check: #9db8e6; --check-soft: #232c3b;
+    --liquid: #6fa3d9; --drug-stroke: var(--muted); --on-accent: #2a120c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+    --bg: #1b1816; --panel: #252120; --ink: #ece6e1; --muted: #a39a92; --line: #3b3532;
+    --accent: #e58a72; --accent-soft: #3a2822; --ok: #8fcf9a; --ok-soft: #22312a;
+    --bad: #f08c8c; --bad-soft: #3a2324; --check: #9db8e6; --check-soft: #232c3b;
+    --liquid: #6fa3d9; --drug-stroke: var(--muted); --on-accent: #2a120c; color-scheme: dark;
+}

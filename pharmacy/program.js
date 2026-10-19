@@ -1,0 +1,3 @@
+// Built from programs/pharmacy/program.yaml by build.py. Don't edit by hand.
+window.PROGRAM = {"id": "pharmacy", "title": "Pharmacy Calculations Practice", "heading": "Pharmacy calculations", "subject": "common pharmaceutical calculations", "storage_key": "practice.pharmacy.progress.v1", "file_prefix": "pharmcalc-progress", "telemetry_prefix": "practice.pharmacy", "demo_hard": "alligation|reconstitution|isotonicity|single\\.solvent|weighing"};
+window.PC_CONFIG = {"telemetry": {"endpoint": "", "study": "pilot", "fields": ["day", "problem", "fp", "bank", "format", "topic", "card", "why", "position", "setSize", "correct", "viewedBefore", "rating", "counted", "ms", "stability", "size", "catchUp", "newTopic", "focus", "topics", "daily"]}};
