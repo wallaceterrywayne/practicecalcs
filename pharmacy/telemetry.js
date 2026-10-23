@@ -1,20 +1,56 @@
-// Optional usage data. Off unless PC_CONFIG.telemetry.endpoint is set AND the student has agreed
-// (Edit deck → "Share anonymous practice data"). Students are identified only by a random ID made
-// on their device; no names or emails. Only the fields listed in the program's program.yaml
-// (telemetry.fields) are sent; the typed answer is not on that list unless it's added on purpose.
-// Events wait in an outbox and are sent in small batches; if sending fails they stay for next time.
+// Anonymous usage data. On only when the program's program.yaml sets telemetry.endpoint (a Google
+// Apps Script web app; see docs/HOSTING.md). Never on in the demo. There is no switch for students.
+//
+// Three kinds of record, one tab each in the Google Sheet (see hosting/collect.gs):
+//   attempt   one answered problem
+//   student   one row per student (re-sent when it changes; the newest row wins)
+//   report    a student tapped "Report a problem" under a worked solution
+// Exactly the fields in telemetry.fields.<kind> are sent; anything else is dropped here.
+//
+// Students are identified only by a random ID (state.sid) kept in their saved progress, so it
+// follows their progress file to other devices. It is never shown anywhere in the app.
+// A tester ID: opening the app once with ?tester in the address marks this student as a tester
+// for good (saved with the ID and in a separate browser key, so later visits by the normal link,
+// or erasing progress, don't undo it).
+// Records wait in an outbox and go in small batches; if sending fails they wait for next time.
 (function () {
   const cfg = (window.PC_CONFIG && window.PC_CONFIG.telemetry) || {};
   const enabled = !!cfg.endpoint && !window.PC_DEMO;
-  const OUT = window.PROGRAM.telemetry_prefix + ".outbox", UID = window.PROGRAM.telemetry_prefix + ".uid";
+  const PREFIX = window.PROGRAM.telemetry_prefix;
+  const OUT = PREFIX + ".outbox", TESTER = PREFIX + ".t", REPORTED = PREFIX + ".reported";
+  // Onboarding questions (program.yaml telemetry.questions): [{field, question, options}], asked once each.
+  const questions = (Array.isArray(cfg.questions) ? cfg.questions : []).filter((q) => q.field && Array.isArray(q.options));
   const get = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
   const put = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } };
-  let uid = get(UID, null);
-  if (enabled && !uid) { uid = "s-" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); put(UID, uid); }
-  let consent = () => false;
+
+  // The tester link: remember it, then tidy the address so it isn't bookmarked or shared by accident.
+  try {
+    const url = new URL(location.href);
+    if (url.searchParams.has("tester")) {
+      put(TESTER, true);
+      url.searchParams.delete("tester");
+      history.replaceState(null, "", url.pathname + url.search + url.hash);
+    }
+  } catch (e) { /* old browser: ignore */ }
+
+  const newId = () => {
+    const a = new Uint8Array(8);
+    (window.crypto || {}).getRandomValues ? crypto.getRandomValues(a) : a.forEach((_, i) => (a[i] = Math.random() * 256));
+    return [...a].map((b) => "abcdefghjkmnpqrstuvwxyz23456789"[b % 31]).join("");
+  };
+
+  // Gives the saved progress its hidden ID and tester mark (call on every load and import).
+  // Returns true if the student row needs (re)sending.
+  function adopt(state) {
+    let changed = false;
+    if (!state.sid) { state.sid = newId(); changed = true; }
+    if (get(TESTER, false) && !state.tester) { state.tester = true; changed = true; }
+    if (state.tester) put(TESTER, true);     // a tester file loaded on a new device keeps it a tester device
+    return changed;
+  }
 
   function flush() {
-    if (!enabled || !consent()) return;
+    if (!enabled) return;
     const box = get(OUT, []);
     if (!box.length) return;
     const batch = box.slice(0, 50);
@@ -24,22 +60,38 @@
       .catch(() => { /* offline: try again later */ });
   }
 
-  function send(type, data) {
-    if (!enabled || !consent()) return;
+  function send(kind, data) {
+    if (!enabled) return;
+    const allowed = (cfg.fields || {})[kind];
+    if (!Array.isArray(allowed)) return;
+    const rec = { kind, irb: cfg.irb || "", consent: cfg.consent || "NA", ...data };
+    const row = { kind };
+    allowed.forEach((k) => { if (rec[k] !== undefined) row[k] = rec[k]; });
     const box = get(OUT, []);
-    // Only the fields listed in program.yaml (telemetry.fields) are sent.
-    const allowed = Array.isArray(cfg.fields) ? Object.fromEntries(Object.entries(data).filter(([k]) => cfg.fields.includes(k))) : data;
-    box.push({ t: new Date().toISOString(), uid, study: cfg.study || "", type, program: window.PROGRAM.id, ...allowed });
-    put(OUT, box.slice(-2000));
+    box.push(row);
+    put(OUT, box.slice(-5000));
     flush();
+  }
+
+  // The student row. `state.profile` holds the onboarding answers, keyed by field name.
+  function student(state, today) {
+    const pr = state.profile || {};
+    const answers = Object.fromEntries(questions.map((q) => [q.field, pr[q.field] ?? (q.field === "year_at_start" ? pr.year : "") ?? ""]));
+    send("student", { student: state.sid, app: window.PROGRAM.id, created: pr.created || today,
+                      ...answers, tester: !!state.tester, updated: today });
+  }
+
+  // "Report a problem": once per problem per browser.
+  const reported = (id) => get(REPORTED, []).includes(id);
+  function report(state, today, p, bank) {
+    send("report", { student: state.sid, date: today, problem: p.id, fp: p.fp, bank });
+    put(REPORTED, get(REPORTED, []).concat(p.id).slice(-2000));
   }
 
   window.Telemetry = {
     enabled,
-    setConsent(fn) { consent = fn; flush(); },
-    send,
-    flush,
-    uid: () => uid,
+    questions,
+    adopt, send, student, report, reported, flush,
   };
   window.addEventListener("online", flush);
 })();
