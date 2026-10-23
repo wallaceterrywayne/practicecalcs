@@ -68,6 +68,19 @@
     return cfg.daily_options.map((n) => `<option value="${n}" ${n === selected ? "selected" : ""}>${n} problems${n === rec ? " (recommended)" : ""}</option>`).join("");
   }
 
+  // Usage data: ratings as 1–5, and answers as the number (or choice text) the app read, never raw typing.
+  const RATING = { stuck: 1, slip: 2, hard: 3, good: 4, easy: 5 };
+  function sentAnswer(a, st) {
+    if (st.value === undefined || st.value === null) return "";
+    const f = Answers.formatOf(a);
+    if (f === "choice") return a.choices[st.value];
+    if (f === "multi") return [].concat(st.value).map((i) => a.choices[i]).join("; ");
+    return st.value;
+  }
+  // Onboarding questions: only when this program collects data, and each only until answered.
+  const unanswered = () => (!DEMO && window.Telemetry && Telemetry.enabled)
+    ? Telemetry.questions.filter((q) => !(state.profile && state.profile[q.field])) : [];
+
   // Topic status rolled up from its cards.
   function topicStatus(t) {
     const cards = liveCards(t);
@@ -105,7 +118,9 @@
         will appear more often, so you can target your practice on the skills that really need it.</p>
         <p>The purpose of this app isn't to replace homework or other dedicated study, but allow you to slowly
         develop your skills over time with only a few minutes of practice daily, while ensuring your skills stay fresh.</p>
-        <p class="muted">No data is stored outside of this internet browser on this device. If you switch to a
+        <p class="muted">${window.Telemetry && Telemetry.enabled
+          ? "Your schedule and progress are saved in this internet browser on this device. Anonymous practice data (which problems you answer, whether they're right, your ratings, and timing; never your name) is collected to help improve the app."
+          : "No data is stored outside of this internet browser on this device."} If you switch to a
         different device or different browser, your personal schedule won't follow.</p>
         ${first ? '<button class="btn" id="next">Pick my topics</button>' : ""}
       </div>`;
@@ -146,11 +161,8 @@
           <label for="catchUp"><strong>Catch-up mode</strong>
           <span class="muted small">Do a few extra problems to catch up on missed problems.</span></label></div>
         <p class="muted small">A few problems every day works better than many problems once in a while.</p>
-        ${window.Telemetry && Telemetry.enabled ? `<div class="check-row">
-          <input type="checkbox" id="share" ${state.settings.share ? "checked" : ""}>
-          <label for="share"><strong>Share anonymous practice data</strong>
-          <span class="muted small">Helps your instructor improve this app: which problems you get, whether they're right,
-          your ratings, and timing. You're identified only by a random code on this device, never your name.</span></label></div>` : ""}
+        ${unanswered().map((q) => `<div class="row"><label for="q-${esc(q.field)}"><strong>${esc(q.question)}</strong></label>
+          <select id="q-${esc(q.field)}" class="onboard" data-field="${esc(q.field)}"><option value="">Choose…</option>${q.options.map((o) => `<option>${esc(o)}</option>`).join("")}</select></div>`).join("")}
         <div class="feedback" id="err"></div>
         <div class="tools"><button class="btn" id="saveDeck">${first ? "Start practicing" : "Save deck"}</button></div>
       </div>`;
@@ -168,12 +180,19 @@
         e.className = "feedback bad"; e.textContent = "Check at least one topic first.";
         return;
       }
+      const asked = [...$app.querySelectorAll("select.onboard")];
+      if (asked.some((x) => !x.value)) {
+        const e = document.getElementById("err");
+        e.className = "feedback bad"; e.textContent = "Answer the questions above first.";
+        return;
+      }
       state.settings.daily = +document.getElementById("daily").value;
       state.settings.catchUp = document.getElementById("catchUp").checked;
-      const share = document.getElementById("share");
-      if (share) state.settings.share = share.checked;
-      if (window.Telemetry) Telemetry.send("settings", { topics: checked.join(" "), daily: state.settings.daily,
-                                                        catchUp: state.settings.catchUp });
+      if (asked.length) {
+        state.profile = { created: today(), ...(state.profile || {}) };
+        asked.forEach((x) => (state.profile[x.dataset.field] = x.value));
+        Telemetry.student(state, today());
+      }
       Scheduler.setTopics(state, checked, cardsOf);
       save();
       // Resize today's set to the new settings (answered problems stay).
@@ -217,10 +236,7 @@
   }
 
   function renderToday() {
-    const fresh = !state.sessions[today()];
     const s = session();
-    if (fresh && window.Telemetry && s.items.length) Telemetry.send("set", { day: today(), size: s.items.length,
-      catchUp: s.catchUp || 0, newTopic: s.newTopic || 0, focus: Scheduler.focusActive(state, today()) || "" });
     save();   // building today's set may have unlocked cards
     const items = todayItems();
     const done = items.filter((x) => x.done).length;
@@ -292,6 +308,14 @@
     Render.renderSolution(p, sol);
     // The problem ID sits just after the solution card (shown with it), so the answer stays the card's last line.
     sol.insertAdjacentHTML("afterend", `<p class="pid small sol-id">${esc(p.id)}</p>`);
+    if (window.Telemetry && Telemetry.enabled) {
+      const done = Telemetry.reported(p.id);
+      sol.insertAdjacentHTML("beforeend", `<p class="small report-row">${done ? '<span class="muted">Thanks, reported.</span>'
+        : '<button type="button" class="linkbtn small" id="report">Report a problem with this question</button>'}</p>`);
+      const rb = document.getElementById("report");
+      if (rb) rb.onclick = () => { Telemetry.report(state, today(), p, (meta.bank || {}).version);
+                                   rb.outerHTML = '<span class="muted">Thanks, reported.</span>'; };
+    }
     const fb = document.getElementById("fb");
     const ans = Answers.mount(document.getElementById("answer"), p.answer, (r) => check(r));
     ans.focus();
@@ -312,6 +336,7 @@
       if (r.error) { fb.className = "feedback bad"; fb.textContent = r.error; return; }
       st.checked = true;
       st.answer = Answers.formatOf(p.answer) === "choice" ? p.answer.choices[r.value] : r.raw;
+      st.value = r.value;
       st.ms = Date.now() - shown;
       const g = Answers.grade(p.answer, r.value);
       st.correct = g.correct;
@@ -343,11 +368,11 @@
       item.result = st.viewedBefore ? "viewed" : st.correct ? "correct" : "miss";
       if (window.Telemetry) {
         const last = state.log[state.log.length - 1];
-        Telemetry.send("attempt", { day: today(), problem: p.id, topic: item.topic, card: item.card, why: item.why,
-          position: idx + 1, setSize: items.length, answer: st.answer, correct: st.correct, viewedBefore: st.viewedBefore,
-          rating, counted: last.counted, ms: st.ms ?? null, fp: p.fp, bank: (meta.bank || {}).version,
-          format: Answers.formatOf(p.answer),
-          stability: Math.round((state.cards[item.card].stability || 0) * 100) / 100 });
+        Telemetry.send("attempt", { student: state.sid, problem: p.id, fp: p.fp, card: item.card, date: today(),
+          ms: st.ms ?? (Date.now() - shown), correct: st.correct, viewedBefore: st.viewedBefore, rating: RATING[rating],
+          answer: sentAnswer(p.answer, st), correct_answer: sentAnswer(p.answer, { value: p.answer.value }),
+          counted: last.counted, stability: Math.round((state.cards[item.card].stability || 0) * 100) / 100,
+          position: idx + 1, setSize: items.length, model: cfg.memory_model || "stability", bank: (meta.bank || {}).version });
       }
       save();
       disableAnswer();
@@ -392,7 +417,12 @@
       const f = e.target.files[0];
       if (!f) return;
       Store.importFile(f).then((s) => {
-        state = s; save();
+        if (!s.sid) s.sid = state.sid;
+        if (!s.profile && state.profile) s.profile = state.profile;
+        if (state.tester) s.tester = true;
+        state = s;
+        if (window.Telemetry) { Telemetry.adopt(state); if (state.profile) Telemetry.student(state, today()); }
+        save();
         return loadDeckData().then(() => {
           msg.className = "feedback ok";
           msg.textContent = `Loaded: ${s.topics.length} topics, ${s.log.length} past problems.`;
@@ -402,7 +432,10 @@
     document.getElementById("reset").onclick = () => {
       if (!confirm("Erase your deck and all progress in this browser?")) return;
       Store.clear();
+      const keep = { sid: state.sid, tester: state.tester, profile: state.profile };   // same student, fresh start
       state = Scheduler.newState(cfg);
+      Object.entries(keep).forEach(([k, v]) => { if (v !== undefined) state[k] = v; });
+      save();
       view = "welcome"; render();
     };
   }
@@ -412,9 +445,10 @@
     meta = PC.meta;
     cfg = meta.scheduler;
     meta.topics.forEach((t) => { cardsOf[t.id] = t.cards.map((c) => c.id); });
-    if (window.Telemetry) Telemetry.setConsent(() => !!(state && state.settings.share));
     state = DEMO ? JSON.parse(JSON.stringify(DEMO.state)) : (Store.load() || Scheduler.newState(cfg));
     state.program = P.id;      // progress files say which program they belong to
+    delete state.settings.share;   // the old "share data" switch, now removed
+    if (!DEMO && window.Telemetry && Telemetry.adopt(state)) { save(); if (state.profile) Telemetry.student(state, today()); }
     if (state.settings.catchUp === undefined) state.settings.catchUp = cfg.catch_up_default;
     state.topics = state.topics.filter((t) => cardsOf[t]);   // drop topics removed from the content
     if (state.topics.length) Scheduler.setTopics(state, state.topics, cardsOf);   // picks up new cards from content updates
