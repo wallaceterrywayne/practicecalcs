@@ -78,8 +78,9 @@
     return st.value;
   }
   // Onboarding questions: only when this program collects data, and each only until answered.
-  const unanswered = () => (!DEMO && window.Telemetry && Telemetry.enabled)
-    ? Telemetry.questions.filter((q) => !(state.profile && state.profile[q.field])) : [];
+  // The demo shows every question, filled in with the sample student's answers.
+  const unanswered = () => !window.Telemetry ? [] : DEMO ? Telemetry.questions
+    : Telemetry.enabled ? Telemetry.questions.filter((q) => !(state.profile && state.profile[q.field])) : [];
 
   // Topic status rolled up from its cards.
   function topicStatus(t) {
@@ -118,7 +119,7 @@
         will appear more often, so you can target your practice on the skills that really need it.</p>
         <p>The purpose of this app isn't to replace homework or other dedicated study, but allow you to slowly
         develop your skills over time with only a few minutes of practice daily, while ensuring your skills stay fresh.</p>
-        <p class="muted">${window.Telemetry && Telemetry.enabled
+        <p class="muted">${window.Telemetry && Telemetry.collects
           ? "Your schedule and progress are saved in this internet browser on this device. Anonymous practice data (which problems you answer, whether they're right, your ratings, and timing; never your name) is collected to help improve the app."
           : "No data is stored outside of this internet browser on this device."} If you switch to a
         different device or different browser, your personal schedule won't follow.</p>
@@ -162,7 +163,8 @@
           <span class="muted small">Do a few extra problems to catch up on missed problems.</span></label></div>
         <p class="muted small">A few problems every day works better than many problems once in a while.</p>
         ${unanswered().map((q) => `<div class="row"><label for="q-${esc(q.field)}"><strong>${esc(q.question)}</strong></label>
-          <select id="q-${esc(q.field)}" class="onboard" data-field="${esc(q.field)}"><option value="">Choose…</option>${q.options.map((o) => `<option>${esc(o)}</option>`).join("")}</select></div>`).join("")}
+          <select id="q-${esc(q.field)}" class="onboard" data-field="${esc(q.field)}"><option value="">Choose…</option>${q.options.map((o) => `<option ${(state.profile || {})[q.field] === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div>`).join("")}
+        ${DEMO && Telemetry.questions.length ? '<p class="muted small">Demo: a new student answers these once, when building their first deck.</p>' : ""}
         <div class="feedback" id="err"></div>
         <div class="tools"><button class="btn" id="saveDeck">${first ? "Start practicing" : "Save deck"}</button></div>
       </div>`;
@@ -191,7 +193,7 @@
       if (asked.length) {
         state.profile = { created: today(), ...(state.profile || {}) };
         asked.forEach((x) => (state.profile[x.dataset.field] = x.value));
-        Telemetry.student(state, today());
+        if (!DEMO) Telemetry.student(state, today());
       }
       Scheduler.setTopics(state, checked, cardsOf);
       save();
@@ -261,7 +263,7 @@
         <div class="progress"><div style="width:${(100 * done) / items.length}%"></div></div>
         <button class="btn" id="go">${done ? "Continue" : "Start today's problems"}</button>`;
     }
-    $app.innerHTML = header(`<button class="linkbtn" id="edit">Edit deck</button><button class="linkbtn" id="prog">Progress</button>${DEMO ? "" : '<button class="linkbtn" id="about">About</button>'}`)
+    $app.innerHTML = header(`<button class="linkbtn" id="edit">Edit deck</button><button class="linkbtn" id="prog">Progress</button><button class="linkbtn" id="about">About</button>`)
       + storageNotice() + `<div class="card">${main}</div>
       <div class="card"><h2>Your deck</h2><table class="status-table">${rows}</table>
       <p class="muted small">Each topic has a few kinds of problems ("skills"), introduced a few at a time.
