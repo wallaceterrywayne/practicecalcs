@@ -1,7 +1,7 @@
 // Anonymous usage data. On only when the program's program.yaml sets telemetry.endpoint (a Google
 // Apps Script web app; see docs/HOSTING.md). Never on in the demo. There is no switch for students.
 //
-// Three kinds of record, one tab each in the Google Sheet (see hosting/collect.gs):
+// Three kinds of record, one tab each in the Google Sheet (the script is built per program: programs/<id>/build/collect.gs):
 //   attempt   one answered problem
 //   student   one row per student (re-sent when it changes; the newest row wins)
 //   report    a student tapped "Report a problem" under a worked solution
@@ -15,7 +15,8 @@
 // Records wait in an outbox and go in small batches; if sending fails they wait for next time.
 (function () {
   const cfg = (window.PC_CONFIG && window.PC_CONFIG.telemetry) || {};
-  const enabled = !!cfg.endpoint && !window.PC_DEMO;
+  // Checked at use, not at load: the demo page sets PC_DEMO in a script that loads after this one.
+  const on = () => !!cfg.endpoint && !window.PC_DEMO;
   const PREFIX = window.PROGRAM.telemetry_prefix;
   const OUT = PREFIX + ".outbox", TESTER = PREFIX + ".t", REPORTED = PREFIX + ".reported";
   // Onboarding questions (program.yaml telemetry.questions): [{field, question, options}], asked once each.
@@ -50,7 +51,7 @@
   }
 
   function flush() {
-    if (!enabled) return;
+    if (!on()) return;
     const box = get(OUT, []);
     if (!box.length) return;
     const batch = box.slice(0, 50);
@@ -61,7 +62,7 @@
   }
 
   function send(kind, data) {
-    if (!enabled) return;
+    if (!on() || !data.student) return;   // no record without a student ID
     const allowed = (cfg.fields || {})[kind];
     if (!Array.isArray(allowed)) return;
     const rec = { kind, irb: cfg.irb || "", consent: cfg.consent || "NA", ...data };
@@ -89,7 +90,8 @@
   }
 
   window.Telemetry = {
-    enabled,
+    get enabled() { return on(); },
+    collects: !!cfg.endpoint,          // this program collects (even on its demo page, which never sends)
     questions,
     adopt, send, student, report, reported, flush,
   };
