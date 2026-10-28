@@ -77,10 +77,11 @@
     if (f === "multi") return [].concat(st.value).map((i) => a.choices[i]).join("; ");
     return st.value;
   }
-  // Onboarding questions: only when this program collects data, and each only until answered.
+  // Onboarding questions: asked once each whenever the program has them, collecting or not (answers
+  // stay on the device until the program collects; then the student row is sent).
   // The demo shows every question, filled in with the sample student's answers.
   const unanswered = () => !window.Telemetry ? [] : DEMO ? Telemetry.questions
-    : Telemetry.enabled ? Telemetry.questions.filter((q) => !(state.profile && state.profile[q.field])) : [];
+    : Telemetry.questions.filter((q) => !(state.profile && state.profile[q.field]));
 
   // Topic status rolled up from its cards.
   function topicStatus(t) {
@@ -450,7 +451,12 @@
     state = DEMO ? JSON.parse(JSON.stringify(DEMO.state)) : (Store.load() || Scheduler.newState(cfg));
     state.program = P.id;      // progress files say which program they belong to
     delete state.settings.share;   // the old "share data" switch, now removed
-    if (!DEMO && window.Telemetry && Telemetry.adopt(state)) { save(); if (state.profile) Telemetry.student(state, today()); }
+    if (!DEMO && window.Telemetry) {
+      const changed = Telemetry.adopt(state);
+      // Send the student row if it changed, or if it has never gone out (e.g. collection was switched on later).
+      if (state.profile && (changed || !state.profileSent)) Telemetry.student(state, today());
+      if (changed || state.profileSent) save();
+    }
     if (state.settings.catchUp === undefined) state.settings.catchUp = cfg.catch_up_default;
     state.topics = state.topics.filter((t) => cardsOf[t]);   // drop topics removed from the content
     if (state.topics.length) Scheduler.setTopics(state, state.topics, cardsOf);   // picks up new cards from content updates

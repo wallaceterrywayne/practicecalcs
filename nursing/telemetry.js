@@ -76,10 +76,12 @@
 
   // The student row. `state.profile` holds the onboarding answers, keyed by field name.
   function student(state, today) {
+    if (!on() || !state.sid) return;
     const pr = state.profile || {};
     const answers = Object.fromEntries(questions.map((q) => [q.field, pr[q.field] ?? (q.field === "year_at_start" ? pr.year : "") ?? ""]));
     send("student", { student: state.sid, app: window.PROGRAM.id, created: pr.created || today,
                       ...answers, tester: !!state.tester, updated: today });
+    state.profileSent = true;   // the caller saves
   }
 
   // "Report a problem": once per problem per browser.
