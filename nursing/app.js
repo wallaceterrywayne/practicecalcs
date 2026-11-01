@@ -121,9 +121,10 @@
         <p>The purpose of this app isn't to replace homework or other dedicated study, but allow you to slowly
         develop your skills over time with only a few minutes of practice daily, while ensuring your skills stay fresh.</p>
         <p class="muted">${window.Telemetry && Telemetry.collects
-          ? "Your schedule and progress are saved in this internet browser on this device. Anonymous practice data (which problems you answer, whether they're right, your ratings, and timing; never your name) is collected to help improve the app."
+          ? "Your schedule and progress are saved in this internet browser on this device."
           : "No data is stored outside of this internet browser on this device."} If you switch to a
-        different device or different browser, your personal schedule won't follow.</p>
+        different device or different browser, your personal schedule won't follow.${window.Telemetry && Telemetry.collects
+          ? " Anonymized practice data is collected to help improve the app." : ""}</p>
         ${first ? '<button class="btn" id="next">Pick my topics</button>' : ""}
       </div>`;
     const on = (id, f) => { const e = document.getElementById(id); if (e) e.onclick = f; };
@@ -163,7 +164,7 @@
           <label for="catchUp"><strong>Catch-up mode</strong>
           <span class="muted small">Do a few extra problems to catch up on missed problems.</span></label></div>
         <p class="muted small">A few problems every day works better than many problems once in a while.</p>
-        ${unanswered().map((q) => `<div class="row"><label for="q-${esc(q.field)}"><strong>${esc(q.question)}</strong></label>
+        ${unanswered().map((q) => `<div class="row onboard-row"><label for="q-${esc(q.field)}"><strong>${esc(q.question)}</strong></label>
           <select id="q-${esc(q.field)}" class="onboard" data-field="${esc(q.field)}"><option value="">Choose…</option>${q.options.map((o) => `<option ${(state.profile || {})[q.field] === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div>`).join("")}
         ${DEMO && Telemetry.questions.length ? '<p class="muted small">Demo: a new student answers these once, when building their first deck.</p>' : ""}
         <div class="feedback" id="err"></div>
