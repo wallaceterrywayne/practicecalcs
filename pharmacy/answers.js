@@ -18,7 +18,7 @@
   // A number as a student might type it: 2.5, 2,500, .75, 1/2, 1 1/2, 1½, ½, -3. Text after the
   // number (a unit such as "mL") is ignored. Anything else → NaN.
   function parseNumber(s) {
-    let t = String(s).trim().replace(/(\d),(?=\d{3}\b)/g, "$1").replace(/⁄/g, "/");
+    let t = String(s).trim().replace(/^\$\s*/, "").replace(/^(-)\s*\$\s*/, "$1").replace(/(\d),(?=\d{3}\b)/g, "$1").replace(/⁄/g, "/");
     const m = t.match(/^(-?)\s*(?:(\d+)\s*)?([½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/);
     if (m) return (m[1] ? -1 : 1) * ((m[2] ? +m[2] : 0) + VULGAR[m[3]]);
     const mixed = t.match(/^(-?)(\d+)\s+(\d+)\s*\/\s*(\d+)/);                     // 1 1/2
@@ -34,7 +34,10 @@
 
   const FORMATS = {
     number: {
-      html: (a) => `${textInput("Your answer")}<span class="unit">${esc(a.unit || "")}</span><button class="btn ans-check" type="button">Check</button>`,
+      // A dollar answer shows "$" before the box; every other unit goes after it.
+      html: (a) => a.unit === "$"
+        ? `<span class="unit">$</span>${textInput("Your answer")}<button class="btn ans-check" type="button">Check</button>`
+        : `${textInput("Your answer")}<span class="unit">${esc(a.unit || "")}</span><button class="btn ans-check" type="button">Check</button>`,
       read: (el) => {
         const raw = el.querySelector(".ans-input").value.trim();
         const value = parseNumber(raw);
